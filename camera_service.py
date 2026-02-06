@@ -22,6 +22,14 @@ FRAME_HEIGHT = int(os.getenv("CAMERA_HEIGHT", "960"))
 FRAME_FPS = int(os.getenv("CAMERA_FPS", "30"))
 DNX64_DLL_PATH = os.getenv("DNX64_DLL_PATH", "")
 DNX64_DEVICE_INDEX = int(os.getenv("DNX64_DEVICE_INDEX", "0"))
+DNX64_EXPOSURE_INDEX = os.getenv("DNX64_EXPOSURE_INDEX")
+DNX64_GAIN_INDEX = os.getenv("DNX64_GAIN_INDEX", "9")
+DEFAULT_EXPOSURE_MIN = int(os.getenv("CAMERA_EXPOSURE_MIN", "1"))
+DEFAULT_EXPOSURE_MAX = int(os.getenv("CAMERA_EXPOSURE_MAX", "30000"))
+DEFAULT_GAIN_MIN = int(os.getenv("CAMERA_GAIN_MIN", "0"))
+DEFAULT_GAIN_MAX = int(os.getenv("CAMERA_GAIN_MAX", "32"))
+DEFAULT_FOCUS_MIN = int(os.getenv("CAMERA_FOCUS_MIN", "0"))
+DEFAULT_FOCUS_MAX = int(os.getenv("CAMERA_FOCUS_MAX", "100"))
 
 CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -74,6 +82,16 @@ def _init_camera() -> cv2.VideoCapture:
     return cam
 
 
+def _close_camera():
+    global _camera
+    if _camera is not None:
+        try:
+            _camera.release()
+        except Exception:
+            pass
+    _camera = None
+
+
 def _encode_frame(frame) -> bytes:
     ok, encoded = cv2.imencode(".jpg", frame)
     if not ok:
@@ -81,15 +99,118 @@ def _encode_frame(frame) -> bytes:
     return encoded.tobytes()
 
 
+def _get_video_proc_range(dnx64, index_env: str | None):
+    if dnx64 is None or not index_env:
+        return None
+    try:
+        idx = int(index_env)
+        _, min_val, max_val, step, default = dnx64.GetVideoProcAmpValueRange(idx)
+        return {"min": int(min_val), "max": int(max_val), "step": int(step), "default": int(default)}
+    except Exception:
+        return None
+
+
+def _get_focus_range(dnx64):
+    if dnx64 is None:
+        return None
+    try:
+        upper, lower = dnx64.GetLensPosLimits(DNX64_DEVICE_INDEX)
+        return {"min": int(min(lower, upper)), "max": int(max(lower, upper))}
+    except Exception:
+        return None
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    camera_open = _camera is not None and _camera.isOpened()
+    return {"status": "ok", "camera_open": camera_open}
 
 
 @app.get("/stream")
 async def stream(request: Request):
     base = str(request.base_url).rstrip("/")
     return {"stream_url": f"{base}/mjpeg"}
+
+
+@app.post("/start")
+async def start_camera():
+    _init_camera()
+    return {"status": "started"}
+
+
+@app.post("/stop")
+async def stop_camera():
+    _close_camera()
+    return {"status": "stopped"}
+
+
+@app.get("/params")
+async def get_params():
+    cam = _init_camera()
+    dnx64 = _init_dnx64()
+
+    exposure_range = _get_video_proc_range(dnx64, DNX64_EXPOSURE_INDEX) or {
+        "min": DEFAULT_EXPOSURE_MIN,
+        "max": DEFAULT_EXPOSURE_MAX,
+        "step": 1,
+        "default": DEFAULT_EXPOSURE_MIN,
+    }
+    gain_range = _get_video_proc_range(dnx64, DNX64_GAIN_INDEX) or {
+        "min": DEFAULT_GAIN_MIN,
+        "max": DEFAULT_GAIN_MAX,
+        "step": 1,
+        "default": DEFAULT_GAIN_MIN,
+    }
+    focus_range = _get_focus_range(dnx64) or {
+        "min": DEFAULT_FOCUS_MIN,
+        "max": DEFAULT_FOCUS_MAX,
+        "step": 1,
+        "default": DEFAULT_FOCUS_MIN,
+    }
+
+    auto_exposure = None
+    auto_focus = None
+    try:
+        auto_exposure = int(cam.get(cv2.CAP_PROP_AUTO_EXPOSURE))
+    except Exception:
+        pass
+    if dnx64 is not None:
+        try:
+            auto_exposure = dnx64.GetAutoExposure(DNX64_DEVICE_INDEX)
+        except Exception:
+            pass
+
+    try:
+        auto_focus = int(cam.get(cv2.CAP_PROP_AUTOFOCUS))
+    except Exception:
+        pass
+
+    exposure = None
+    gain = None
+    focus = None
+    try:
+        exposure = float(cam.get(cv2.CAP_PROP_EXPOSURE))
+    except Exception:
+        pass
+    if dnx64 is not None:
+        try:
+            exposure = dnx64.GetExposureValue(DNX64_DEVICE_INDEX)
+        except Exception:
+            pass
+
+    try:
+        gain = float(cam.get(cv2.CAP_PROP_GAIN))
+    except Exception:
+        pass
+
+    return {
+        "exposure": exposure,
+        "gain": gain,
+        "focus": focus,
+        "autoExposure": True if auto_exposure == 1 else False if auto_exposure == 0 else None,
+        "autoFocus": True if auto_focus == 1 else False if auto_focus == 0 else None,
+        "ranges": {"exposure": exposure_range, "gain": gain_range, "focus": focus_range},
+    }
 
 
 @app.get("/mjpeg")
@@ -155,7 +276,7 @@ async def set_params(payload: dict):
             except Exception:
                 pass
 
-    if exposure is not None:
+    if exposure is not None and (auto_exposure is False or auto_exposure is None):
         try:
             cam.set(cv2.CAP_PROP_EXPOSURE, float(exposure))
         except Exception:
@@ -178,7 +299,7 @@ async def set_params(payload: dict):
         except Exception:
             pass
 
-    if focus is not None:
+    if focus is not None and (auto_focus is False or auto_focus is None):
         try:
             cam.set(cv2.CAP_PROP_FOCUS, float(focus))
         except Exception:

@@ -12,5 +12,8 @@ if "%DEVICE_INDEX%"=="" set DEVICE_INDEX=0
 
 set CAMERA_SERVICE_PORT=%PORT%
 set DNX64_DEVICE_INDEX=%DEVICE_INDEX%
+set DNX64_GAIN_INDEX=9
+set CAMERA_EXPOSURE_MIN=1
+set CAMERA_EXPOSURE_MAX=30000
 
 python -m uvicorn camera_service:app --host 0.0.0.0 --port %PORT%

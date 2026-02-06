@@ -97,6 +97,8 @@ scripts\start_camera_service.cmd 1 12002
 - `CAMERA_SERVICE_PORT`: Service port. Default: `12002`.
 - `DNX64_DLL_PATH`: Path to `DNX64.dll` if you need hardware parameter control.
 - `DNX64_DEVICE_INDEX`: DNX64 device index. Default: `0`.
+- `DNX64_EXPOSURE_INDEX`: DNX64 VideoProcAmp index for exposure (optional).
+- `DNX64_GAIN_INDEX`: DNX64 VideoProcAmp index for gain (optional).
 
 ### Endpoints
 
@@ -105,6 +107,21 @@ scripts\start_camera_service.cmd 1 12002
 - `GET /mjpeg` (MJPEG stream)
 - `POST /params` (set camera params)
 - `POST /capture` (capture image)
+
+---
+
+## DNX64 VideoProcAmp Index Scanner
+
+Use this script to find the correct VideoProcAmp indices for exposure/gain ranges.
+
+```sh
+python ./scripts/scan_dnx64_procamp.py
+```
+
+It prints all valid indices and their ranges. Pick the indices that match exposure/gain in your device manual, then set:
+
+- `DNX64_EXPOSURE_INDEX`
+- `DNX64_GAIN_INDEX`
 
 ---
 
