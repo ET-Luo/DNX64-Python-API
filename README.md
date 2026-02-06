@@ -73,6 +73,41 @@ micro_scope.SetExposureValue(0, 1000)
 
 ---
 
+## Camera Service (USB)
+
+This project includes a lightweight FastAPI service to expose the camera stream and control endpoints for Robot-UI.
+
+### Start (Windows)
+
+PowerShell:
+
+```powershell
+./scripts/start_camera_service.ps1 -CameraIndex 1 -Port 12002
+```
+
+CMD:
+
+```cmd
+scripts\start_camera_service.cmd 1 12002
+```
+
+### Optional environment variables
+
+- `CAMERA_INDEX`: OpenCV camera index (USB). Default: `0`.
+- `CAMERA_SERVICE_PORT`: Service port. Default: `12002`.
+- `DNX64_DLL_PATH`: Path to `DNX64.dll` if you need hardware parameter control.
+- `DNX64_DEVICE_INDEX`: DNX64 device index. Default: `0`.
+
+### Endpoints
+
+- `GET /health`
+- `GET /stream` (returns stream URL)
+- `GET /mjpeg` (MJPEG stream)
+- `POST /params` (set camera params)
+- `POST /capture` (capture image)
+
+---
+
 ## Project Wiki
 
 - [Appendix: Parameter Table](https://github.com/dino-lite/DNX64-Python-API/wiki/Appendix:-Parameter-Table).

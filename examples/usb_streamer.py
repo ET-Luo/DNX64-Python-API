@@ -9,6 +9,7 @@ import cv2
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 960
 CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_FPS = 1280, 960, 30
 DNX64_PATH = "C:\\Program Files\\DNX64\\DNX64.dll"
+
 DEVICE_INDEX = 0
 # Camera index, please change it if you have more than one camera,
 # i.e. webcam, connected to your PC until CAM_INDEX is been set to first Dino-Lite product.
